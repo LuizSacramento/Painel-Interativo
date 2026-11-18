@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Egressos BSI · UNIRIO — Painel Analítico</title>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+  FONTES EXTERNAS (Google Fonts)
+  - Space Grotesk  → fonte principal do painel (labels, textos gerais)
+  - IBM Plex Mono  → fonte monoespaçada para valores numéricos e KPIs
+  - Fraunces       → fonte serifada para títulos e valores grandes dos KPIs
+══════════════════════════════════════════════════════════════════════ -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&display=swap" rel="stylesheet">
+
+<!-- ═══════════════════════════════════════════════════════════════════
+  CHART.JS — biblioteca responsável por todos os gráficos do painel:
+    - Gráfico de linha: Empregabilidade, Renda e Progressão Salarial
+    - Gráfico de rosca (donut): Distribuição de Atuação
+══════════════════════════════════════════════════════════════════════ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+  RESET GLOBAL
+  Remove margens e paddings padrão do navegador em todos os elementos
+══════════════════════════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+/* ═══════════════════════════════════════════════════════════════════
+  VARIÁVEIS CSS (Design Tokens)
+  Definem as cores e raios de borda usados em todo o painel.
+  Alterar aqui afeta o estilo de todos os componentes.
+
+  Cores base:
+    --ink / ink2 / ink3  → tons de preto/cinza para texto
+    --paper              → cor de fundo da página
+    --card / card2       → fundos dos cartões/seções
+
+  Cores semânticas (usadas em pills, badges e gráficos):
+    --blue   → gráfico de emprego, botão ativo padrão
+    --green  → atuantes na área TI
+    --amber  → avisos de filtros desativados
+    --red    → indicadores negativos
+    --purple → gráfico de renda
+    --teal   → mediana/média na área TI
+
+  Raios de borda:
+    --r     → bordas dos cartões grandes (10px)
+    --r-sm  → bordas dos mini-cards de estatísticas (6px)
+══════════════════════════════════════════════════════════════════════ */
+:root{
+  --ink:#0d0d12;--ink2:#3a3a4a;--ink3:#7a7a90;
+  --paper:#f5f4ef;--card:#ffffff;--card2:#f9f8f4;
+  --border:rgba(13,13,18,0.09);--border2:rgba(13,13,18,0.16);
+  --blue:#1a4bcc;--blue-bg:#e8eeff;--green:#0d7a52;--green-bg:#e4f5ec;
+  --amber:#a05a00;--amber-bg:#fff1dc;--red:#b52020;--red-bg:#fdeaea;
+  --purple:#5c30b5;--purple-bg:#eeebff;--teal:#0a6e6e;--teal-bg:#e0f5f5;
+  --r:10px;--r-sm:6px;
+}
+
+/* Rolagem suave ao clicar em âncoras internas */
+html{scroll-behavior:smooth}
+
+/* Fonte e cor de fundo base da página */
+body{font-family:'Space Grotesk',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;font-size:14px;line-height:1.6;}
+
+/* ═══════════════════════════════════════════════════════════════════
+  CABEÇALHO (TOPBAR)
+  Barra preta no topo da página, fixada durante o scroll (sticky).
+  Contém o logo, o título do TCC e o badge de identificação.
+  z-index:200 garante que fique acima de todos os outros elementos.
+══════════════════════════════════════════════════════════════════════ */
+.topbar{background:var(--ink);color:#fff;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;gap:16px;}
+.topbar-brand{display:flex;align-items:center;gap:12px;}
+
+/* Quadrado azul com a letra "E" (logo do painel) */
+.logo-box{width:36px;height:36px;background:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:18px;font-style:italic;color:#fff;font-weight:700;}
+
+/* Área de texto ao lado do logo: título + subtítulo */
+.brand-text{display:flex;flex-direction:column;gap:1px;}
+.brand-title{font-family:'Fraunces',serif;font-size:15px;font-weight:700;letter-spacing:-0.2px;line-height:1;}
+.brand-sub{font-size:10px;color:rgba(255,255,255,0.5);font-family:'IBM Plex Mono',monospace;letter-spacing:0.3px;}
+
+/* Badge cinza translúcido no canto direito do cabeçalho (ex: "TCC 2026") */
+.topbar-badge{font-family:'IBM Plex Mono',monospace;font-size:10px;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:4px;white-space:nowrap;}
+
+/* ═══════════════════════════════════════════════════════════════════
+  BARRA DE FILTROS
+  Fica logo abaixo do cabeçalho, também fixada durante o scroll
+  (top:64px = altura do topbar). z-index:150 fica abaixo do topbar.
+  Contém os grupos de filtros: Critério, Gênero e Turma.
+══════════════════════════════════════════════════════════════════════ */
+.filters-zone{background:var(--card);border-bottom:1px solid var(--border);padding:10px 32px;position:sticky;top:64px;z-index:150;}
+
+/* Layout base (telas largas ≥900px): tudo numa linha, reset na direita */
+.filters-inner{
+  display:flex;
+  flex-wrap:nowrap;
+  align-items:center;
+  gap:8px 12px;
+  max-width:1320px;
+  margin:0 auto;
+}
+
+/* Grupo de filtro individual: label + botões */
+.fgroup{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+
+/* Label acima dos botões de filtro ("CRITÉRIO", "GÊNERO", "TURMA") */
+.flabel{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;white-space:nowrap;}
+
+/* Contêiner dos botões de filtro */
+.fbtns{display:flex;gap:3px;flex-wrap:nowrap;}
+
+/* Botão de filtro individual — estilo padrão (inativo) */
+.fbtn{font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:500;padding:3px 10px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--ink2);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.fbtn:hover{background:var(--card2);color:var(--ink)}
+
+/* Botão de filtro ATIVO — fundo preto, texto branco */
+.fbtn.active{background:var(--ink);border-color:var(--ink);color:#fff}
+
+/* Variantes de cor para botões ativos */
+.fbtn.blue.active{background:var(--blue);border-color:var(--blue)}
+.fbtn.green.active{background:var(--green);border-color:var(--green)}
+
+/* ─────────────────────────────────────────────────────────────
+  BOTÃO DESATIVADO (.disabled)
+  Aplicado dinamicamente via JS (updateYearButtons) quando uma
+  turma não tem dados disponíveis para o critério selecionado.
+  ex: turma 2024 não tem dados "3 anos após", então o botão
+      "2024" fica desativado ao selecionar esse critério.
+───────────────────────────────────────────────────────────── */
+.fbtn.disabled{color:#c0b8b8;background:#f5f0f0;border-color:#e8dfdf;cursor:not-allowed;opacity:0.7;}
+.fbtn.disabled:hover{background:#f5f0f0;color:#c0b8b8;}
+
+/* Divisor vertical entre grupos de filtros */
+.fdiv{width:1px;height:20px;background:var(--border2);flex-shrink:0;}
+
+/* Espaço flexível que empurra o botão "Resetar" para a direita */
+.filter-spacer{flex:1;}
+
+/* ─────────────────────────────────────────────────────────────
+  BOTÃO RESETAR FILTROS
+  Fica no extremo direito da barra de filtros.
+  Ao clicar, chama resetFilters() que restaura o estado padrão.
+───────────────────────────────────────────────────────────── */
+.reset-btn{
+  font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:500;
+  color:var(--ink2);background:rgba(13,13,18,0.05);
+  border:1px solid var(--border2);border-radius:8px;
+  padding:5px 12px;cursor:pointer;transition:all 0.15s;
+  white-space:nowrap;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;gap:4px;
+}
+/* Hover: borda e texto ficam vermelhos sinalizando ação de reset */
+.reset-btn:hover{background:rgba(13,13,18,0.09);color:var(--red);border-color:var(--red);}
+
+/* ═══════════════════════════════════════════════════════════════════
+  RESPONSIVIDADE — FILTROS (TABLET, 600–899px)
+  Em telas médias, os filtros quebram em 2 linhas:
+    Linha 1: Critério + Gênero
+    Linha 2: Turma + Resetar
+══════════════════════════════════════════════════════════════════════ */
+@media(max-width:899px){
+  .filters-zone{padding:10px 16px;top:60px;}
+  .filters-inner{flex-wrap:wrap;align-items:flex-start;row-gap:8px;}
+  .fgroup-criterio,.fgroup-genero{flex-shrink:0;}
+  /* Turma quebra para linha nova */
+  .fgroup-turma{flex-basis:100%;order:3;}
+  /* Separadores verticais somem */
+  .fdiv-turma{display:none;}
+  .fdiv{display:none;}
+  .filter-spacer{display:none;}
+  /* Reset vai no final da segunda linha */
+  .reset-btn{order:4;margin-left:auto;}
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+  RESPONSIVIDADE — FILTROS (MOBILE, ≤500px)
+  Em telas pequenas, layout vira grid de 2 colunas:
+    Coluna 1: Critério / Gênero / Turma (empilhados)
+    Coluna 2: Botão "Resetar" ocupa toda a altura (vertical rotacionado)
+══════════════════════════════════════════════════════════════════════ */
+@media(max-width:500px){
+  .filters-zone{padding:8px 12px;}
+  .filters-inner{display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto auto;align-items:start;gap:8px;}
+  .fgroup-criterio{grid-column:1;grid-row:1;}
+  .fgroup-genero{grid-column:1;grid-row:2;}
+  .fgroup-turma{grid-column:1;grid-row:3;}
+  .fdiv,.fdiv-turma,.filter-spacer{display:none;}
+  /* Reset ocupa a coluna 2 inteira, texto rotacionado verticalmente */
+  .reset-btn{
+    grid-column:2;grid-row:1/4;
+    align-self:stretch;
+    writing-mode:vertical-rl;
+    text-orientation:mixed;
+    padding:8px 5px;
+    font-size:9px;
+    border-radius:6px;
+    white-space:normal;
+    height:100%;
+    letter-spacing:0.2px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+  ÁREA PRINCIPAL DE CONTEÚDO
+  Contêiner centralizado com largura máxima de 1320px.
+  Padding lateral 32px em telas grandes, 16px em mobile.
+══════════════════════════════════════════════════════════════════════ */
+.main{max-width:1320px;margin:0 auto;padding:28px 32px 80px;}
+
+/* ─────────────────────────────────────────────────────────────
+  CABEÇALHOS DE SEÇÃO (linha com título + subtítulo)
+  Usados em "Visão Geral" e "Empregabilidade e Renda"
+───────────────────────────────────────────────────────────── */
+.sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+.sec-title{font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:var(--ink);}
+.sec-sub{font-size:11px;color:var(--ink3);font-family:'IBM Plex Mono',monospace;}
+
+/* ═══════════════════════════════════════════════════════════════════
+  SEÇÃO: VISÃO GERAL — CARDS DE KPI
+  Grid com 4 colunas em telas largas. Cada card exibe um indicador
+  numérico principal (ex: "78.3% taxa de emprego").
+  O card "Total de Egressos" usa .wide-card para ocupar toda a linha.
+══════════════════════════════════════════════════════════════════════ */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px;}
+
+/* Card que se expande para ocupar todas as colunas (ex: Total de Egressos) */
+.kpi.wide-card{grid-column:1/-1;}
+
+/* Estilo base do card KPI */
+.kpi{background:var(--card);border:1px solid rgba(13,13,18,0.13);border-radius:var(--r);padding:16px 18px 14px;position:relative;overflow:visible;transition:box-shadow 0.2s;text-align:center;}
+.kpi:hover{box-shadow:0 4px 16px rgba(0,0,0,0.06)}
+
+/* ─────────────────────────────────────────────────────────────
+  TOOLTIP DOS KPIs
+  Aparece ao passar o mouse sobre um card KPI.
+  Explica a fórmula/definição do indicador (ex: "Empregados / Total").
+  Posicionado acima do card com seta apontando para baixo.
+───────────────────────────────────────────────────────────── */
+.kpi{position:relative;}
+.kpi:hover .kpi-tooltip-box{opacity:1;pointer-events:none;transform:translateX(-50%) translateY(0);}
+.kpi-tooltip-box{
+  position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%) translateY(6px);
+  background:#1a1a2e;color:#fff;font-size:11.5px;line-height:1.65;
+  padding:10px 14px;border-radius:8px;width:240px;text-align:left;
+  opacity:0;pointer-events:none;transition:opacity 0.2s,transform 0.2s;z-index:9999;
+  font-family:'Space Grotesk',sans-serif;box-shadow:0 6px 20px rgba(0,0,0,0.25);
+}
+/* Setinha triangular abaixo do tooltip */
+.kpi-tooltip-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:#1a1a2e;}
+
+/* Elementos internos do card KPI */
+.kpi-accent{display:none;}  /* reservado — não utilizado atualmente */
+.kpi-lbl{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;display:block;}
+.kpi-val{font-family:'Fraunces',serif;font-size:26px;font-weight:700;line-height:1;margin-bottom:4px;}
+.kpi-detail{display:none;}  /* subtexto do KPI — não exibido visualmente */
+
+/* Badge colorido (ex: "↑ 5.2pp") — ainda não utilizado nos KPIs atuais */
+.kpi-tag{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;margin-top:5px;}
+.kpi-tag.up{background:var(--green-bg);color:var(--green)}.kpi-tag.dn{background:var(--red-bg);color:var(--red)}
+
+/* ═══════════════════════════════════════════════════════════════════
+  GRID DOS GRÁFICOS
+  Grid de 2 colunas usado na seção "Empregabilidade e Renda".
+  .wide = elemento que ocupa as 2 colunas (ex: gráfico de linha grande)
+══════════════════════════════════════════════════════════════════════ */
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:24px;}
+.wide{grid-column:1/-1}
+
+/* ─────────────────────────────────────────────────────────────
+  CARD DE GRÁFICO (.ccard)
+  Contêiner branco com borda que envolve cada gráfico.
+  Inclui cabeçalho (.cchead) com título e subtítulo.
+───────────────────────────────────────────────────────────── */
+.ccard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px 22px;}
+.cchead{display:flex;justify-content:center;align-items:flex-start;margin-bottom:14px;text-align:center;}
+.cc-title{font-family:'Fraunces',serif;font-size:14px;font-weight:700;color:var(--ink);line-height:1.2;}
+.cc-sub{font-size:10px;color:var(--ink3);margin-top:3px;font-family:'IBM Plex Mono',monospace}
+
+/* ─────────────────────────────────────────────────────────────
+  LEGENDA DOS GRÁFICOS (.legend-row)
+  Fileira de bolinhas coloridas clicáveis que ficam acima dos gráficos.
+  Clicar em um item de legenda destaca a série correspondente.
+  .ldot-sq = quadradinho colorido ao lado do nome da série
+───────────────────────────────────────────────────────────── */
+.legend-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.ldot{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ink2);}
+.ldot-sq{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+
+/* ═══════════════════════════════════════════════════════════════════
+  TABELA DE INDICADORES (.tcard)
+  Card que envolve a tabela com scroll horizontal em telas pequenas.
+  Cabeçalho da tabela (.thead-row) com título e contador de linhas.
+══════════════════════════════════════════════════════════════════════ */
+.tcard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:24px;}
+.thead-row{padding:14px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+
+/* Permite scroll horizontal quando a tabela é larga demais */
+.twrap{overflow-x:auto}
+
+/* ─────────────────────────────────────────────────────────────
+  ESTILOS DA TABELA
+  th: cabeçalhos clicáveis para ordenar (cursor:pointer).
+      Setas ↑ ↓ adicionadas via CSS para indicar coluna ordenada.
+  tr:hover: highlight da linha ao passar o mouse
+  .pill: badge colorido (Alta/Média/Baixa — usado para classificações)
+  .bar-wrap / .bar-track / .bar-fill: mini barra de progresso inline
+───────────────────────────────────────────────────────────── */
+table{width:100%;border-collapse:collapse;font-size:12px}
+
+/* Cabeçalho da tabela — clicável para ordenar colunas */
+th{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink3);padding:10px 14px;text-align:center;border-bottom:1px solid var(--border);background:var(--card2);white-space:nowrap;cursor:pointer;user-select:none;}
+th:hover{color:var(--ink)}
+
+/* Setas de ordenação adicionadas via CSS (gerenciadas via JS — sortTable) */
+th.sort-asc::after{content:' ↑'}th.sort-desc::after{content:' ↓'}
+th.num,td.num{text-align:center}
+td{padding:9px 14px;border-bottom:1px solid var(--border);color:var(--ink);vertical-align:middle;}
+
+/* Hover nas linhas da tabela — torna as linhas clicáveis visualmente */
+tr:last-child td{border-bottom:none}tr:hover td{background:#f7f7fb}
+
+/* Badges de nível (alta/média/baixa) — não utilizados ativamente na v6 */
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap;}
+.pill.hi{background:var(--green-bg);color:var(--green)}.pill.mid{background:var(--amber-bg);color:var(--amber)}.pill.lo{background:var(--red-bg);color:var(--red)}
+
+/* Mini barras horizontais inline na tabela */
+.bar-wrap{display:flex;align-items:center;gap:7px}
+.bar-track{flex:1;height:4px;background:var(--paper);border-radius:10px;overflow:hidden;min-width:50px}
+.bar-fill{height:100%;border-radius:10px;background:var(--blue)}.bar-fill.g{background:var(--green)}.bar-fill.a{background:var(--amber)}.bar-fill.p{background:var(--purple)}
+.bar-v{font-weight:500;color:var(--ink);min-width:38px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px}
+
+/* ═══════════════════════════════════════════════════════════════════
+  CARDS DE GÊNERO (.gcard)
+  Dois cards lado a lado: Masculino e Feminino.
+  Cada card exibe estatísticas individuais por gênero com mini barras.
+  .gc-ico       → círculo colorido com a letra M ou F
+  .gc-stats     → grid 3 colunas com métricas (taxa emprego, mediana...)
+  .mini-bar-row → linha com ano + barra de progresso + percentual
+══════════════════════════════════════════════════════════════════════ */
+.gcard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;}
+.gc-head{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.gc-ico{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;font-family:'IBM Plex Mono',monospace;}
+.gc-title{font-family:'Fraunces',serif;font-size:14px;font-weight:700}
+.gc-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;}
+.gc-stat{background:var(--card2);border-radius:var(--r-sm);padding:9px 10px;}
+.gc-stat-lbl{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:3px;}
+.gc-stat-val{font-family:'Fraunces',serif;font-size:17px;font-weight:700;color:var(--ink);}
+
+/* Mini barras nas linhas de ano dos cards de gênero */
+.mini-bar-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:10px;color:var(--ink2)}
+.mini-bar-yr{width:32px;font-weight:600;font-family:'IBM Plex Mono',monospace}
+.mini-bar-track{flex:1;height:4px;background:var(--paper);border-radius:10px;overflow:hidden}
+.mini-bar-fill{height:100%;border-radius:10px}
+.mini-bar-val{min-width:32px;text-align:right;font-family:'IBM Plex Mono',monospace}
+
+/* Linha de estatística dentro do gcard — separada por bordas */
+.stat-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.stat-row:last-child{border-bottom:none}.stat-row-lbl{color:var(--ink2)}.stat-row-val{font-family:'Fraunces',serif;font-size:15px;font-weight:700}
+
+/* ═══════════════════════════════════════════════════════════════════
+  RODAPÉ
+  Exibido abaixo de todos os conteúdos.
+  Contém: autores, orientador, instituição e ano.
+══════════════════════════════════════════════════════════════════════ */
+.footer{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink3);text-align:center;margin-top:40px;padding-top:20px;border-top:1px solid var(--border);line-height:1.8;}
+
+/* ═══════════════════════════════════════════════════════════════════
+  GRÁFICO DE DISTRIBUIÇÃO DE ATUAÇÃO — DONUT
+  Layout flexível: donut à esquerda + legenda com barras à direita.
+  Em mobile (≤600px), empilha verticalmente.
+══════════════════════════════════════════════════════════════════════ */
+.atu-layout{display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;}
+.atu-donut-wrap{width:180px;height:180px;flex-shrink:0;position:relative;}
+.atu-donut-wrap canvas{width:180px!important;height:180px!important;}
+.atu-labels{flex:0 1 220px;min-width:160px;display:flex;flex-direction:column;gap:8px;margin-top:0;}
+@media(max-width:600px){
+  .atu-layout{flex-direction:column;align-items:center;}
+  .atu-donut-wrap{width:160px;height:160px;}
+  .atu-donut-wrap canvas{width:160px!important;height:160px!important;}
+  .atu-labels{width:100%;max-width:300px;}
+}
+
+/* Linhas da legenda do donut: bolinha + nome + percentual + mini barra */
+.atu-label-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink2);}
+.atu-label-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+.atu-label-pct{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--ink);min-width:42px;}
+.atu-label-bar{flex:1;height:6px;background:var(--paper);border-radius:10px;overflow:hidden;}
+.atu-label-bar-fill{height:100%;border-radius:10px;}
+
+/* ═══════════════════════════════════════════════════════════════════
+  TOGGLE DE RENDA (Mediana / Média)
+  Botões que alternam entre exibir Mediana ou Média no gráfico de renda.
+  O botão ativo fica com fundo roxo (--purple).
+══════════════════════════════════════════════════════════════════════ */
+.renda-toggle{display:flex;gap:4px;margin-bottom:14px;}
+.rtbtn{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;padding:4px 12px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--ink2);cursor:pointer;transition:all 0.15s;}
+.rtbtn:hover{background:var(--card2)}.rtbtn.active{background:var(--purple);border-color:var(--purple);color:#fff;}
+
+/* ═══════════════════════════════════════════════════════════════════
+  RESPONSIVIDADE — LAYOUT GERAL
+  Tablet (600–1100px): KPIs em 2 colunas
+  Mobile (≤600px): KPIs em 1 coluna, tooltips menores
+  Mobile (≤900px): padding reduzido, grid de gráficos em 1 coluna,
+                   badge do topbar oculto
+══════════════════════════════════════════════════════════════════════ */
+@media(max-width:1100px) and (min-width:601px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr);}
+  .kpi.wide-card{grid-column:1/-1;}
+}
+@media(max-width:600px){
+  .kpi-grid{grid-template-columns:1fr;}
+  .kpi.wide-card{grid-column:1/-1;}
+  .kpi-tooltip-box{width:200px;font-size:11px;}
+}
+@media(max-width:900px){
+  .topbar{padding:12px 16px}
+  .main{padding:20px 16px 60px}.grid-2{grid-template-columns:1fr}.wide{grid-column:auto}
+  .gc-stats{grid-template-columns:1fr 1fr}
+  .topbar-badge{display:none}
+}
+
+/* ─────────────────────────────────────────────────────────────
+  ALTURAS FIXAS DOS CANVAS DOS GRÁFICOS
+  Cada classe define a altura do container do canvas Chart.js.
+  O Chart.js respeita a altura do container pai para renderizar.
+    .ch-260 → usado nos gráficos de linha maiores
+    .ch-240 → gráfico de renda
+    .ch-220, .ch-200, .ch-180 → tamanhos menores conforme necessário
+───────────────────────────────────────────────────────────── */
+.ch-260{position:relative;width:100%;height:260px}
+.ch-240{position:relative;width:100%;height:240px}
+.ch-220{position:relative;width:100%;height:220px}
+.ch-200{position:relative;width:100%;height:200px}
+.ch-180{position:relative;width:100%;height:180px}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+  CABEÇALHO (TOPBAR)
+  Barra preta fixa no topo. Exibe o título completo do TCC centralizado.
+  O logo (.logo-box) e o badge (.topbar-badge) podem ser re-ativados
+  removendo os estilos inline de ocultação, se desejado.
+════════════════════════════════════════════════════════════════════ -->
+<header class="topbar">
+  <div class="topbar-brand" style="flex:1;justify-content:center;">
+    <div class="brand-text" style="align-items:center;text-align:center;">
+      <div class="brand-title" style="font-size:13px;line-height:1.4;max-width:860px;letter-spacing:-0.1px;">Análise da Empregabilidade e da Inserção Profissional dos Concluintes do Bacharelado em Sistemas de Informação da UNIRIO</div>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+  BARRA DE FILTROS (sticky, fica abaixo do topbar durante o scroll)
+
+  FILTRO: CRITÉRIO (data-c)
+    Seleciona o momento de coleta dos dados:
+    0 = Ano de formação | 1 = 1 ano após | 2 = 2 anos após | 3 = 3 anos após
+    Afeta: KPIs, gráfico de atuação, gráfico de renda (parcial), tabela
+
+  FILTRO: GÊNERO (data-g)
+    Filtra por gênero dos egressos: todos / masculino / feminino
+    Afeta: KPIs, todos os gráficos, tabela
+
+  FILTRO: TURMA (data-a)
+    Filtra por ano de formatura específico (2019–2024) ou todas
+    Botões ficam desabilitados automaticamente se a turma não tiver
+    dados para o critério selecionado (lógica em updateYearButtons)
+    Afeta: KPIs, gráfico de atuação, tabela
+    NÃO afeta: gráfico de emprego (mostrado em nota laranja no card)
+               gráfico de renda (idem)
+               gráfico de progressão salarial (idem)
+
+  BOTÃO RESETAR: restaura state={c:0, g:'todos', a:'todos'}
+════════════════════════════════════════════════════════════════════ -->
+<div class="filters-zone" id="filters-zone">
+  <div class="filters-inner">
+    <!-- Grupo: Critério -->
+    <div class="fgroup fgroup-criterio">
+      <span class="flabel">Critério</span>
+      <div class="fbtns" id="fg-criterio">
+        <button class="fbtn active" data-c="0">Ano formação</button>
+        <button class="fbtn" data-c="1">1 ano após</button>
+        <button class="fbtn" data-c="2">2 anos após</button>
+        <button class="fbtn" data-c="3">3 anos após</button>
+      </div>
+    </div>
+    <div class="fdiv"></div><!-- separador vertical -->
+
+    <!-- Grupo: Gênero -->
+    <div class="fgroup fgroup-genero">
+      <span class="flabel">Gênero</span>
+      <div class="fbtns" id="fg-genero">
+        <button class="fbtn active" data-g="todos">Todos</button>
+        <button class="fbtn" data-g="M">Masculino</button>
+        <button class="fbtn" data-g="F">Feminino</button>
+      </div>
+    </div>
+    <div class="fdiv fdiv-turma"></div><!-- separador vertical (some em tablet) -->
+
+    <!-- Grupo: Turma (ano de formatura) -->
+    <div class="fgroup fgroup-turma">
+      <span class="flabel">Turma</span>
+      <div class="fbtns" id="fg-ano">
+        <button class="fbtn active" data-a="todos">Todas</button>
+        <button class="fbtn" data-a="2019">2019</button>
+        <button class="fbtn" data-a="2020">2020</button>
+        <button class="fbtn" data-a="2021">2021</button>
+        <button class="fbtn" data-a="2022">2022</button>
+        <button class="fbtn" data-a="2023">2023</button>
+        <button class="fbtn" data-a="2024">2024</button>
+      </div>
+    </div>
+
+    <!-- Espaço flexível que empurra o botão resetar para a direita -->
+    <div class="filter-spacer"></div>
+
+    <!-- Botão que reseta todos os filtros para o estado padrão -->
+    <button class="reset-btn" onclick="resetFilters()">↺ Resetar filtros</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+  CONTEÚDO PRINCIPAL
+════════════════════════════════════════════════════════════════════ -->
+<div class="main">
+
+  <!-- ──────────────────────────────────────────────────────────────
+    SEÇÃO: VISÃO GERAL — KPIs
+    O subtítulo (#kpi-criterio-lbl) é atualizado dinamicamente pelo JS
+    para refletir os filtros ativos (ex: "1 ano após · Turma 2021 · Feminino")
+    O grid (#kpi-grid) é preenchido inteiramente pela função buildKPIs().
+    KPIs exibidos (8 cards + 1 wide):
+      - Taxa de Emprego
+      - Taxa de Emprego na Área de TI
+      - Porcentagem de Atuantes na Área
+      - Porcentagem de Atuantes Fora da Área
+      - Renda Média Geral
+      - Renda Média de TI
+      - Renda Mediana Geral
+      - Renda Mediana de TI
+      - Total de Egressos (wide — ocupa linha inteira)
+  ─────────────────────────────────────────────────────────────── -->
+  <div class="sec-head" style="margin-bottom:14px;justify-content:center;text-align:center;">
+    <div class="sec-title">Visão Geral</div>
+    <div class="sec-sub" id="kpi-criterio-lbl">— Ano de formação · Todas as turmas · Todos os gêneros</div>
+  </div>
+  <div class="kpi-grid" id="kpi-grid"></div><!-- preenchido por buildKPIs() -->
+
+  <!-- ──────────────────────────────────────────────────────────────
+    SEÇÃO: EMPREGABILIDADE E RENDA
+    Contém 4 gráficos dispostos em grid de 2 colunas.
+  ─────────────────────────────────────────────────────────────── -->
+  <div class="sec-head" style="justify-content:center;text-align:center;"><div class="sec-title">Empregabilidade e Renda</div></div>
+  <div class="grid-2" style="margin-bottom:24px">
+
+    <!-- ────────────────────────────────────────────────────────────
+      GRÁFICO 1: EVOLUÇÃO DE EMPREGO POR ANO DE FORMATURA (linha)
+      Ocupa as 2 colunas (.wide). Canvas: #cEmprego
+      Construído por: buildChartEmprego()
+      Legenda interativa em #leg-emp — clicar destaca uma série.
+      Toggle de métrica (#emp-taxa-btns): muda entre
+        "Taxa de Emprego" / "Taxa de Emprego na Área de TI" /
+        "Porcentagem de Atuantes na Área" / "Fora da Área"
+      ⚠ FILTROS DESATIVADOS: critério e turma NÃO afetam este gráfico.
+        Somente o filtro de gênero se aplica.
+    ──────────────────────────────────────────────────────────── -->
+    <div class="ccard wide">
+      <div class="cchead">
+        <div>
+          <div class="cc-title">Evolução de Emprego por Ano de Formatura</div>
+          <!-- Aviso em âmbar informando quais filtros estão desativados -->
+          <div class="cc-sub" style="color:var(--amber);font-style:italic;">⚠ Os filtros de critério e turma foram desativados neste gráfico. Somente o filtro de gênero se aplica.</div>
+        </div>
+      </div>
+      <!-- Botões para alternar a métrica exibida no eixo Y do gráfico -->
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;" id="emp-taxa-btns">
+        <button class="fbtn active" data-taxa="geral" onclick="setEmpTaxa('geral',this)">Taxa de Emprego</button>
+        <button class="fbtn" data-taxa="area" onclick="setEmpTaxa('area',this)">Taxa de Emprego na Área de TI</button>
+        <button class="fbtn" data-taxa="naArea" onclick="setEmpTaxa('naArea',this)">Porcentagem de Atuantes na Área</button>
+        <button class="fbtn" data-taxa="foraArea" onclick="setEmpTaxa('foraArea',this)">Porcentagem de Atuantes Fora da Área</button>
+      </div>
+      <!-- Legenda clicável (preenchida por buildChartEmprego) -->
+      <div class="legend-row" id="leg-emp"></div>
+      <!-- Canvas do gráfico de linha de emprego -->
+      <div class="ch-260"><canvas id="cEmprego"></canvas></div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────────
+      GRÁFICO 2: DISTRIBUIÇÃO DE ATUAÇÃO (donut/rosca)
+      Canvas: #cAtuacao. Construído por: buildChartAtuacao()
+      Mostra proporção de: Na área TI / Fora da área / Sem vínculo
+      Legenda com barras em #atu-labels (preenchida pelo JS)
+      Responde a: filtros de critério, gênero e turma
+    ──────────────────────────────────────────────────────────── -->
+    <div class="ccard">
+      <div class="cchead">
+        <div>
+          <div class="cc-title">Distribuição de Atuação</div>
+          <div class="cc-sub">Média do critério selecionado</div>
+        </div>
+      </div>
+      <div class="atu-layout">
+        <!-- Canvas do gráfico donut -->
+        <div class="atu-donut-wrap">
+          <canvas id="cAtuacao"></canvas>
+        </div>
+        <!-- Legenda com percentuais e mini barras (preenchida pelo JS) -->
+        <div class="atu-labels" id="atu-labels"></div>
+      </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────────
+      GRÁFICO 3: RENDA POR ANO DE FORMATURA (linha)
+      Canvas: #cRenda. Construído por: buildChartRenda()
+      Mostra mediana (ou média) geral e na área TI.
+      Toggle Mediana/Média: botões .rtbtn que chamam setRendaModo()
+      ⚠ FILTRO DESATIVADO: turma NÃO afeta este gráfico.
+        Critério e gênero se aplicam.
+    ──────────────────────────────────────────────────────────── -->
+    <div class="ccard">
+      <div class="cchead">
+        <div>
+          <div class="cc-title">Renda por Ano de Formatura</div>
+          <!-- Subtítulo dinâmico (atualizado por buildChartRenda) -->
+          <div class="cc-sub" id="renda-sub">Valores corrigidos de acordo com IPCA para jan/2026</div>
+        </div>
+      </div>
+      <!-- Aviso de filtro desativado -->
+      <div style="font-size:10px;color:var(--amber);font-style:italic;margin-bottom:10px;font-family:'IBM Plex Mono',monospace;">⚠ O filtro de turma foi desativado neste gráfico. Os filtros de critério e gênero se aplicam.</div>
+      <!-- Toggle Mediana / Média -->
+      <div class="renda-toggle">
+        <button class="rtbtn" id="rtbtn-mean" onclick="setRendaModo('media')">Média</button>
+        <button class="rtbtn active" id="rtbtn-med" onclick="setRendaModo('mediana')">Mediana</button>
+      </div>
+      <!-- Legenda do gráfico (preenchida por buildChartRenda) -->
+      <div class="legend-row" id="leg-renda"></div>
+      <!-- Canvas do gráfico de linha de renda -->
+      <div class="ch-240"><canvas id="cRenda"></canvas></div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────────
+      GRÁFICO 4: PROGRESSÃO SALARIAL AO LONGO DO TEMPO (linha)
+      Ocupa as 2 colunas (.wide). Canvas: #cProg
+      Construído por: buildChartProg()
+      Mostra a renda mediana de cada turma nos momentos:
+        Formação → 1 ano → 2 anos → 3 anos
+      Legenda clicável em #leg-prog — clicar destaca uma turma.
+      Clicar diretamente no gráfico também destaca a linha da turma.
+      ⚠ FILTROS DESATIVADOS: critério e turma NÃO afetam este gráfico.
+        Somente o filtro de gênero se aplica.
+    ──────────────────────────────────────────────────────────── -->
+    <div class="ccard wide">
+      <div class="cchead">
+        <div>
+          <div class="cc-title">Renda Mediana ao Longo do Tempo — Turmas 2019 a 2024</div>
+          <div class="cc-sub">Valores corrigidos de acordo com IPCA para jan/2026</div>
+        </div>
+      </div>
+      <!-- Aviso de filtros desativados -->
+      <div style="font-size:10px;color:var(--amber);font-style:italic;margin-bottom:10px;font-family:'IBM Plex Mono',monospace;">⚠ Os filtros de critério e turma foram desativados neste gráfico. Somente o filtro de gênero se aplica.</div>
+      <!-- Legenda clicável (preenchida por buildChartProg) -->
+      <div class="legend-row" id="leg-prog"></div>
+      <!-- Canvas do gráfico de progressão salarial -->
+      <div class="ch-260"><canvas id="cProg"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ──────────────────────────────────────────────────────────────
+    TABELA DE INDICADORES
+    Cabeçalho de colunas clicáveis para ordenar (gerenciado por sortTable).
+    Preenchida dinamicamente por buildTable().
+    #tbl-count → contador "X turmas visíveis"
+    ⚠ FILTRO DESATIVADO: turma NÃO afeta a tabela (sempre mostra todas
+      as turmas do critério selecionado).
+      Critério e gênero se aplicam.
+    Colunas: Turma | Egressos | Tx. Emprego | Emprego TI |
+             Atuantes TI | Fora da Área | Mediana Geral | Mediana TI
+  ─────────────────────────────────────────────────────────────── -->
+  <div class="tcard">
+    <div style="padding:16px 20px 14px;border-bottom:1px solid var(--border);text-align:center;">
+      <div class="cc-title">Tabela de Indicadores</div>
+    </div>
+    <div style="padding:8px 20px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <!-- Aviso de filtro desativado -->
+      <div style="font-size:10px;color:var(--amber);font-style:italic;font-family:'IBM Plex Mono',monospace;">⚠ O filtro de turma foi desativado nesta tabela. Os filtros de critério e gênero se aplicam.</div>
+      <!-- Contador de linhas visíveis (atualizado por buildTable) -->
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink3)" id="tbl-count"></div>
+    </div>
+    <div class="twrap">
+      <!-- thead e tbody preenchidos inteiramente por buildTable() -->
+      <table id="main-table"><thead></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- ──────────────────────────────────────────────────────────────
+    RODAPÉ
+    Informações de autoria do TCC: alunos, orientador, instituição e ano.
+  ─────────────────────────────────────────────────────────────── -->
+  <p class="footer">
+    TCC — Luiz Eduardo Barbosa do Sacramento &amp; Vitor Costa Duarte · Orientador: Reinaldo Viana Alvares · UNIRIO · 2026
+  </p>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+  ████████████████████  DADOS DO PAINEL  ████████████████████
+  Objeto DATA: contém todos os dados brutos usados pelo painel.
+  Os valores foram coletados e processados para o TCC.
+  Todos os valores monetários já estão corrigidos pelo IPCA para jan/2026.
+
+  ESTRUTURA:
+    DATA.criterios        → nomes dos 4 critérios temporais
+    DATA.anos[c]          → anos disponíveis para cada critério c
+    DATA.emprego[c]       → taxas de emprego geral e na área TI
+    DATA.atuantes[c]      → % de egressos atuando na área / fora
+    DATA.renda[c]         → mediana e média de renda (geral + área TI)
+    DATA.egressos[c]      → total de egressos por turma em cada critério
+    DATA.egressosGenero   → quantidade de egressos por gênero (M/F)
+    DATA.genero[0|3]      → dados segmentados por gênero
+                            [0] = critério "Ano de formação"
+                            [3] = critério "3 anos após"
+    DATA.formandosAnos    → anos históricos de 2005 a 2025 (todos os formandos)
+    DATA.totalF / mascF / femF → série histórica de formandos (não usada nos gráficos ativos)
+
+  ÍNDICES das turmas nos arrays (sempre na mesma ordem):
+    índice 0 = turma 2019
+    índice 1 = turma 2020
+    índice 2 = turma 2021
+    índice 3 = turma 2022
+    índice 4 = turma 2023
+    índice 5 = turma 2024
+    null     = dado não disponível (turma ainda não tem esse momento)
+═══════════════════════════════════════════════════════════════════════ */
+const DATA = {
+  criterios: ['Ano de formação','1 ano após','2 anos após','3 anos após'],
+  anos: {
+    0:[2019,2020,2021,2022,2023,2024],  // critério 0: todos os anos disponíveis
+    1:[2019,2020,2021,2022,2023],        // critério 1: 2024 ainda sem dado de "1 ano após"
+    2:[2019,2020,2021,2022],             // critério 2: apenas turmas com ≥2 anos formadas
+    3:[2019,2020,2021]                   // critério 3: apenas turmas com ≥3 anos formadas
+  },
+
+  /* Taxa de emprego por critério e turma
+     .geral = % de egressos empregados (qualquer área)
+     .area  = % dos empregados que atuam em TI */
+  emprego:{
+    0:{geral:[76.92,88.24,92.31,75.86,72.73,66.67],area:[75.00,60.00,75.00,90.91,87.50,62.50]},
+    1:{geral:[69.23,94.12,84.62,72.41,81.82,null],area:[72.22,81.25,72.73,80.95,77.78,null]},
+    2:{geral:[69.23,82.35,69.23,58.62,null,null],area:[88.89,64.29,66.67,70.59,null,null]},
+    3:{geral:[61.54,82.35,76.92,null,null,null],area:[81.25,78.57,60.00,null,null,null]}
+  },
+
+  /* Atuação dos egressos (% sobre o total, não só sobre os empregados)
+     .naArea    = % atuando em cargos de TI
+     .foraArea  = % atuando em cargos fora de TI */
+  atuantes:{
+    0:{naArea:[57.69,52.94,69.23,68.97,63.64,41.67],foraArea:[23.08,47.06,23.08,17.24,20.45,25.00]},
+    1:{naArea:[50.00,76.47,61.54,58.62,63.64,null],foraArea:[19.23,29.41,30.77,27.59,22.73,null]},
+    2:{naArea:[61.54,52.94,46.15,41.38,null,null],foraArea:[23.08,35.29,30.77,24.14,null,null]},
+    3:{naArea:[50.00,64.71,46.15,null,null,null],foraArea:[11.54,23.53,38.46,null,null,null]}
+  },
+
+  /* Renda por critério e turma (valores em R$, corrigidos pelo IPCA jan/2026)
+     .med      = mediana geral de renda
+     .medArea  = mediana de renda somente em cargos de TI
+     .mean     = média geral de renda
+     .meanArea = média de renda somente em cargos de TI */
+  renda:{
+    0:{med:[6353.87,5209.95,9146.80,7474.15,8589.03,5761.50],medArea:[6882.67,5534.13,9710.42,7600.90,8904.64,6116.01],
+       mean:[7200.00,5800.00,9600.00,7900.00,8900.00,6100.00],meanArea:[7700.00,6100.00,10200.00,8100.00,9300.00,6500.00]},
+    1:{med:[7307.85,7583.86,8186.14,8597.03,8280.47,null],medArea:[8023.17,8192.99,13444.73,8845.75,9504.06,null],
+       mean:[7800.00,8100.00,8700.00,9100.00,8700.00,null],meanArea:[8500.00,8700.00,14000.00,9300.00,10000.00,null]},
+    2:{med:[8835.37,9169.20,9172.23,8990.85,null,null],medArea:[9113.14,8850.98,9565.03,9060.24,null,null],
+       mean:[9300.00,9700.00,9600.00,9400.00,null,null],meanArea:[9600.00,9300.00,10000.00,9500.00,null,null]},
+    3:{med:[9223.40,11065.91,8504.74,null,null,null],medArea:[9094.84,10843.49,10417.79,null,null,null],
+       mean:[9700.00,11600.00,8900.00,null,null,null],meanArea:[9500.00,11400.00,10900.00,null,null,null]}
+  },
+
+  /* Total de egressos por turma em cada critério
+     null = turma ainda não atingiu aquele momento */
+  egressos:{
+    0:[26,17,13,29,44,12],1:[26,17,13,29,44,null],2:[26,17,13,29,null,null],3:[26,17,13,null,null,null]
+  },
+
+  /* Quantidade de egressos por gênero na turma (critério 0) */
+  egressosGenero:{
+    M:[20,9,9,20,37,8],   // Masculino: turmas 2019–2024
+    F:[6,8,4,9,7,4]       // Feminino: turmas 2019–2024
+  },
+
+  /* Dados segmentados por gênero
+     Disponível para critério 0 (formação) e critério 3 (3 anos após)
+     Cada gênero tem arrays paralelos indexados por turma */
+  genero:{
+    0:{  // Critério: Ano de formação
+      M:{anos:[2019,2020,2021,2022,2023,2024],
+         emprego:[89.47,88.89,88.89,70.00,70.27,50.00],empArea:[88.24,75.00,87.50,92.86,88.46,50.00],
+         naArea:[78.95,66.67,77.78,65.00,62.16,25.00],foraArea:[15.79,33.33,11.11,20.00,21.62,25.00],
+         medRenda:[6814.43,4773.09,9502.79,7905.87,8759.99,5452.93],medArea:[6882.67,5032.68,9710.42,7991.46,9156.22,4125.46]},
+      F:{anos:[2019,2020,2021,2022,2023,2024],
+         emprego:[42.86,87.50,100.00,88.89,85.71,100.00],empArea:[0.00,42.86,50.00,87.50,83.33,75.00],
+         naArea:[0.00,37.50,50.00,77.78,71.43,75.00],foraArea:[42.86,62.50,50.00,11.11,14.29,25.00],
+         medRenda:[4568.63,5952.91,6699.05,7117.59,5343.13,6647.16],medArea:[0.00,7126.44,8954.64,7422.61,5351.70,7139.30]}
+    },
+    3:{  // Critério: 3 anos após
+      M:{anos:[2019,2020,2021],emprego:[68.42,88.89,66.67],empArea:[84.62,87.50,66.67],
+         naArea:[57.89,77.78,44.44],foraArea:[10.53,11.11,22.22],
+         medRenda:[9351.96,10568.47,8262.58],medArea:[9351.96,10228.85,10417.79]},
+      F:{anos:[2019,2020,2021],emprego:[42.86,75.00,100.00],empArea:[66.67,66.67,50.00],
+         naArea:[28.57,50.00,50.00],foraArea:[14.29,37.50,75.00],
+         medRenda:[5692.62,11340.93,8639.43],medArea:[5395.59,11458.14,6945.43]}
+    }
+  },
+
+  /* Série histórica de formandos 2005–2025 (todos os anos do curso)
+     Usada para contexto histórico — não está conectada a nenhum gráfico ativo */
+  formandosAnos:['2005','2006','2007','2008','2009','2010','2011','2012','2013','2014','2015','2016','2017','2018','2019','2020','2021','2022','2023','2024','2025'],
+  totalF:[2,1,1,5,11,20,22,28,40,40,28,26,28,23,29,17,13,26,44,15,15],
+  mascF: [2,1,1,4,11,16,13,20,26,26,20,23,22,19,20,9,9,20,37,8,14],
+  femF:  [0,0,0,1,0,4,9,8,14,14,8,3,6,4,9,8,4,6,7,7,1]
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+  ESTADO GLOBAL DA APLICAÇÃO
+  `state` armazena os filtros ativos e as preferências de visualização.
+  Toda mudança de filtro atualiza `state` e chama update() que
+  reconstrói todos os componentes.
+
+    state.c          → critério ativo (0=formação, 1=1ano, 2=2anos, 3=3anos)
+    state.g          → gênero ativo ('todos', 'M', 'F')
+    state.a          → turma ativa ('todos' ou ano como string: '2021')
+    state.rendaModo  → 'mediana' ou 'media' (toggle do gráfico de renda)
+    state.empTaxa    → métrica do gráfico de emprego
+                       ('geral','area','naArea','foraArea')
+═══════════════════════════════════════════════════════════════════ */
+let state = {c:0, g:'todos', a:'todos', rendaModo:'mediana', empTaxa:'geral'};
+
+/* Instâncias ativas dos gráficos Chart.js (keyed por nome)
+   usado por dc(id) para destruir antes de reconstruir */
+let charts = {};
+
+/* Controle de ordenação da tabela: coluna ativa e direção (1=asc, -1=desc) */
+let sortCol = -1, sortDir = 1;
+
+/* ─────────────────────────────────────────────────────────────
+  FUNÇÕES UTILITÁRIAS
+    avg(arr)     → média aritmética ignorando null/undefined
+    brl(v)       → formata número como "R$ X.XXX" ou "—" se nulo
+    pct(v,d)     → formata como "XX.X%" com d casas decimais, ou "—"
+    dc(id)       → destrói chart existente antes de recriar (evita leak)
+───────────────────────────────────────────────────────────── */
+const avg = arr => {const v=arr.filter(x=>x!==null&&x!==undefined);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
+const brl = v => v!==null&&v!==undefined?'R$\u00A0'+Math.round(v).toLocaleString('pt-BR'):'—';
+const pct = (v,d=1) => v!==null&&v!==undefined?v.toFixed(d)+'%':'—';
+const dc = id => {if(charts[id]){charts[id].destroy();delete charts[id];}};
+
+/* Paleta de cores usada nos gráficos (Chart.js não usa variáveis CSS) */
+function getColors(){
+  return {blue:'#1a4bcc',green:'#0d7a52',amber:'#e06500',purple:'#5c30b5',teal:'#0a6e6e',red:'#b52020',pink:'#d63384',yellow:'#c69500',text2:'#5a5870',gridLine:'rgba(0,0,0,0.06)'};
+}
+
+/* ─────────────────────────────────────────────────────────────
+  TOGGLE DE RENDA (Mediana / Média)
+  Atualiza state.rendaModo e reativa os botões corretos.
+  Chama buildChartRenda() para redesenhar apenas esse gráfico.
+───────────────────────────────────────────────────────────── */
+function setRendaModo(modo){
+  state.rendaModo = modo;
+  document.getElementById('rtbtn-med').classList.toggle('active', modo==='mediana');
+  document.getElementById('rtbtn-mean').classList.toggle('active', modo==='media');
+  buildChartRenda();
+}
+
+/* ─────────────────────────────────────────────────────────────
+  FILTRO DE TURMA (aplicado em KPIs e gráfico de atuação)
+  Quando uma turma específica está selecionada, zera os valores
+  de todas as outras turmas no array (retorna null para índices
+  que não correspondem à turma selecionada).
+───────────────────────────────────────────────────────────── */
+function applyAnoFilter(arr,c){
+  if(state.a==='todos')return arr;
+  const idx=DATA.anos[c].indexOf(parseInt(state.a));
+  if(idx===-1)return arr;
+  return arr.map((v,i)=>i===idx?v:null);
+}
+
+/* ─────────────────────────────────────────────────────────────
+  DESABILITAR BOTÕES DE TURMA INDISPONÍVEIS
+  Chamada sempre que o critério muda.
+  Ex: se critério=3 (3 anos após), turmas 2022/2023/2024 não
+  têm esse dado ainda → seus botões ficam com classe .disabled.
+  Se a turma atualmente selecionada não está disponível,
+  reseta state.a para 'todos'.
+───────────────────────────────────────────────────────────── */
+function updateYearButtons(){
+  const available=DATA.anos[state.c];
+  document.querySelectorAll('[data-a]').forEach(btn=>{
+    const a=btn.dataset.a;
+    if(a==='todos'){btn.classList.remove('disabled');return;}
+    const avail=available.includes(parseInt(a));
+    btn.classList.toggle('disabled',!avail);
+    if(!avail&&state.a===a){state.a='todos';btn.classList.remove('active');}
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+  LISTENERS DOS FILTROS
+  Cada grupo de filtros escuta cliques via event delegation.
+  O atributo data-c / data-g / data-a identifica qual valor foi clicado.
+  Após atualizar o estado, chama update() para redesenhar tudo.
+═══════════════════════════════════════════════════════════════════ */
+
+/* Filtro: Critério */
+document.getElementById('fg-criterio').addEventListener('click',e=>{
+  const b=e.target.closest('[data-c]');if(!b)return;
+  state.c=parseInt(b.dataset.c);
+  document.querySelectorAll('[data-c]').forEach(x=>x.classList.toggle('active',x===b));
+  // Se a turma selecionada não existe neste critério, reseta para 'todos'
+  if(state.a!=='todos'&&!DATA.anos[state.c].includes(parseInt(state.a))){
+    state.a='todos';
+    document.querySelectorAll('[data-a]').forEach(x=>x.classList.toggle('active',x.dataset.a==='todos'));
+  }
+  updateYearButtons();
+  update();
+});
+
+/* Filtro: Gênero */
+document.getElementById('fg-genero').addEventListener('click',e=>{
+  const b=e.target.closest('[data-g]');if(!b)return;
+  state.g=b.dataset.g;
+  document.querySelectorAll('[data-g]').forEach(x=>x.classList.toggle('active',x===b));
+  update();
+});
+
+/* Filtro: Turma (ignora clique se botão estiver desabilitado) */
+document.getElementById('fg-ano').addEventListener('click',e=>{
+  const b=e.target.closest('[data-a]');if(!b)return;
+  if(b.classList.contains('disabled'))return; // bloqueia turmas sem dados
+  state.a=b.dataset.a;
+  document.querySelectorAll('[data-a]').forEach(x=>x.classList.toggle('active',x===b));
+  update();
+});
+
+/* ─────────────────────────────────────────────────────────────
+  RESET DE FILTROS
+  Restaura state para os valores padrão (critério 0, todos, todos).
+  Preserva rendaModo e empTaxa para não resetar as preferências
+  de visualização dos gráficos de renda e emprego.
+  Atualiza visualmente todos os botões para refletir o novo estado.
+───────────────────────────────────────────────────────────── */
+function resetFilters(){
+  const prevEmpTaxa=state.empTaxa;
+  const prevRendaModo=state.rendaModo;
+  state={c:0,g:'todos',a:'todos',rendaModo:prevRendaModo,empTaxa:prevEmpTaxa};
+  document.querySelectorAll('[data-c]').forEach(x=>x.classList.toggle('active',x.dataset.c==='0'));
+  document.querySelectorAll('[data-g]').forEach(x=>x.classList.toggle('active',x.dataset.g==='todos'));
+  document.querySelectorAll('[data-a]').forEach(x=>x.classList.toggle('active',x.dataset.a==='todos'));
+  // Mantém o botão de renda no estado correto (não reseta)
+  document.getElementById('rtbtn-med').classList.toggle('active', prevRendaModo==='mediana');
+  document.getElementById('rtbtn-mean').classList.toggle('active', prevRendaModo==='media');
+  updateYearButtons();
+  update();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+  buildKPIs() — CONSTRÓI OS CARDS DA SEÇÃO VISÃO GERAL
+  Lê os dados de DATA conforme o estado atual (critério, gênero, turma),
+  calcula médias/totais e injeta o HTML no #kpi-grid.
+  Cada KPI mostra: label + valor principal + tooltip ao hover.
+═══════════════════════════════════════════════════════════════════ */
+function buildKPIs(){
+  const c=state.c;
+  // Copia os arrays para não modificar DATA diretamente
+  let empg=DATA.emprego[c].geral.slice();
+  let empa=DATA.emprego[c].area.slice();
+  let meds=DATA.renda[c].med.slice();
+  let medsA=DATA.renda[c].medArea.slice();
+  let means=DATA.renda[c].mean.slice();
+  let meansA=DATA.renda[c].meanArea.slice();
+  let atuN=DATA.atuantes[c].naArea.slice();
+  let atuF=DATA.atuantes[c].foraArea.slice();
+  let egressos=DATA.egressos[c].slice();
+
+  // Aplica filtro de turma: zera índices que não são a turma selecionada
+  if(state.a!=='todos'){
+    const idx=DATA.anos[c].indexOf(parseInt(state.a));
+    const mask=(arr)=>arr.map((v,i)=>i===idx?v:null);
+    empg=mask(empg);empa=mask(empa);meds=mask(meds);medsA=mask(medsA);
+    means=mask(means);meansA=mask(meansA);
+    atuN=mask(atuN);atuF=mask(atuF);egressos=mask(egressos);
+  }
+
+  // Substitui arrays pelos dados de gênero quando filtro gênero está ativo
+  let empgF=empg,empaF=empa,atuNF=atuN,atuFF=atuF,medsF=meds,medsAF=medsA,meansF=means,meansAF=meansA;
+  if(state.g!=='todos'){
+    const gKey=state.c===3?3:0; // usa genero[3] se critério for "3 anos após"
+    const gd=DATA.genero[gKey]?.[state.g];
+    if(gd){
+      const anos=DATA.anos[c];
+      empgF=anos.map((_,i)=>{const gi=gd.anos.indexOf(DATA.anos[c][i]);return gi>=0?gd.emprego[gi]:null});
+      atuNF=anos.map((_,i)=>{const gi=gd.anos.indexOf(DATA.anos[c][i]);return gi>=0?gd.naArea[gi]:null});
+      atuFF=anos.map((_,i)=>{const gi=gd.anos.indexOf(DATA.anos[c][i]);return gi>=0?gd.foraArea[gi]:null});
+      medsF=anos.map((_,i)=>{const gi=gd.anos.indexOf(DATA.anos[c][i]);return gi>=0?gd.medRenda[gi]:null});
+      medsAF=anos.map((_,i)=>{const gi=gd.anos.indexOf(DATA.anos[c][i]);return gi>=0?(gd.medArea[gi]||null):null});
+    }
+  }
+  // Reaplica filtro de turma sobre os dados de gênero
+  if(state.a!=='todos'){
+    const idx=DATA.anos[c].indexOf(parseInt(state.a));
+    const mask=(arr)=>arr.map((v,i)=>i===idx?v:null);
+    empgF=mask(empgF);empaF=mask(empaF);atuNF=mask(atuNF);atuFF=mask(atuFF);
+    medsF=mask(medsF);medsAF=mask(medsAF);meansF=mask(meansF);meansAF=mask(meansAF);
+  }
+
+  // Calcula métricas agregadas (médias e totais)
+  const avgEmp=avg(empgF.filter(v=>v!==null));
+  const avgEmpA=avg(empaF.filter(v=>v!==null));
+  const avgAtuN=avg(atuNF.filter(v=>v!==null));
+  const avgAtuF=avg(atuFF.filter(v=>v!==null));
+  const avgMed=avg(medsF.filter(v=>v!==null));
+  const avgMedA=avg(medsAF.filter(v=>v!==null));
+  const avgMean=avg(meansF.filter(v=>v!==null));
+  const avgMeanA=avg(meansAF.filter(v=>v!==null));
+
+  // Total de egressos: usa egressosGenero quando gênero está filtrado
+  const totalEgressos = (() => {
+    if(state.g==='todos'){
+      return egressos.filter(v=>v!==null).reduce((a,b)=>a+b,0);
+    }
+    const egG = DATA.egressosGenero[state.g] || [];
+    const anos = DATA.anos[c];
+    return anos.map((_,i) => {
+      const v = egG[i]??null;
+      if(v===null) return null;
+      if(state.a!=='todos' && anos[i]!==parseInt(state.a)) return null;
+      return v;
+    }).filter(v=>v!==null).reduce((a,b)=>a+b,0);
+  })();
+
+  // Monta lista de KPIs com label, valor formatado e tooltip explicativo
+  const tooltipRenda = 'Todos os valores foram corrigidos de acordo com o IPCA para a data de jan/2026.';
+  const kpis=[
+    {l:'Taxa de Emprego',v:pct(avgEmp),d:DATA.anos[c].length+' turmas analisadas',tooltip:'Egressos Empregados / Total de Egressos'},
+    {l:'Taxa de Emprego na Área de TI',v:pct(avgEmpA),d:'% dos empregados em TI',tooltip:'Egressos Empregados em Cargos de T.I / Egressos Empregados'},
+    {l:'Porcentagem de Atuantes na Área',v:pct(avgAtuN),d:'% do total de egressos',tooltip:'Egressos Empregados em Cargos de T.I / Total de Egressos'},
+    {l:'Porcentagem de Atuantes Fora da Área',v:pct(avgAtuF),d:'% do total de egressos',tooltip:'Egressos Empregados em Cargos fora de T.I / Total de Egressos'},
+    {l:'Renda Média Geral',v:brl(avgMean),d:'corrigido IPCA jan/2026',tooltip:tooltipRenda},
+    {l:'Renda Média de TI',v:brl(avgMeanA),d:'somente cargos de TI',tooltip:tooltipRenda},
+    {l:'Renda Mediana Geral',v:brl(avgMed),d:'corrigido IPCA jan/2026',tooltip:tooltipRenda},
+    {l:'Renda Mediana de TI',v:brl(avgMedA),d:'somente cargos de TI',tooltip:tooltipRenda},
+    {l:'Total de Egressos',v:String(totalEgressos||'—'),d:'na seleção atual',wide:true}
+  ];
+
+  // Injeta HTML dos cards KPI no grid
+  document.getElementById('kpi-grid').innerHTML=kpis.map(k=>`
+    <div class="kpi${k.wide?' wide-card':''}">
+      <div class="kpi-accent"></div>
+      ${k.tooltip?`<div class="kpi-tooltip-box">${k.tooltip}</div>`:''}
+      <div class="kpi-lbl">${k.l}</div>
+      <div class="kpi-val">${k.v}</div>
+      <div class="kpi-detail">${k.d}</div>
+    </div>`).join('');
+
+  // Atualiza o subtítulo da seção Visão Geral com os filtros ativos
+  const genLabel=state.g==='todos'?'Todos os gêneros':state.g==='M'?'Masculino':'Feminino';
+  const anoLabel=state.a==='todos'?'Todas as turmas':'Turma '+state.a;
+  document.getElementById('kpi-criterio-lbl').textContent=`— ${DATA.criterios[c]} · ${anoLabel} · ${genLabel}`;
+}
+
+/* ─────────────────────────────────────────────────────────────
+  setEmpTaxa(taxa, btn) — altera a métrica exibida no gráfico de emprego
+  Chamada pelos botões dentro de #emp-taxa-btns.
+  Atualiza state.empTaxa e reconstrói apenas o gráfico de emprego.
+───────────────────────────────────────────────────────────── */
+function setEmpTaxa(taxa, btn){
+  state.empTaxa = taxa;
+  document.querySelectorAll('#emp-taxa-btns .fbtn').forEach(b=>b.classList.toggle('active', b===btn));
+  buildChartEmprego();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+  buildChartEmprego() — GRÁFICO 1: EVOLUÇÃO DE EMPREGO (linha)
+  Exibe 4 séries (uma por critério temporal) no eixo X = anos de turma.
+  Cada série pode ser destacada clicando na legenda ou no gráfico.
+  A variável `empHighlight` (null = todas visíveis, número = destaque).
+  Filtros: somente gênero (critério e turma são IGNORADOS neste gráfico).
+═══════════════════════════════════════════════════════════════════ */
+let empHighlight = null;
+
+function buildChartEmprego(){
+  dc('emp'); // destrói o gráfico anterior antes de recriar
+  const allAnos=[2019,2020,2021,2022,2023,2024].map(String);
+  const col=getColors();
+  const criterioColors=[col.blue, col.green, col.amber, col.red];
+  const criterioNames=['Ano de formação','1 ano após','2 anos após','3 anos após'];
+  const criterioStyles=[[],[5,4],[3,3],[8,4]]; // estilos de linha por critério
+
+  const taxa=state.empTaxa;
+
+  // Retorna valores do campo `field` filtrados por gênero
+  function getGenderVals(ci, field){
+    const gd0=DATA.genero[0]?.[state.g];
+    const gd3=DATA.genero[3]?.[state.g];
+    const anos=DATA.anos[ci];
+    const gd = (ci===3 && gd3) ? gd3 : gd0;
+    if(!gd) return allAnos.map(()=>null);
+    return allAnos.map(a=>{
+      const inCriterio=anos.includes(parseInt(a));
+      if(!inCriterio) return null;
+      const gi=gd.anos.indexOf(parseInt(a));
+      if(gi<0) return null;
+      const v=gd[field]?.[gi];
+      return (v!==undefined&&v!==null)?v:null;
+    });
+  }
+
+  // Retorna array de valores para um critério e a taxa selecionada
+  function getVals(ci){
+    const anos=DATA.anos[ci];
+    let vals;
+    if(taxa==='geral'){
+      vals=allAnos.map(a=>{const i=anos.indexOf(parseInt(a));return i>=0?DATA.emprego[ci].geral[i]:null;});
+      if(state.g!=='todos') vals=getGenderVals(ci,'emprego');
+    } else if(taxa==='area'){
+      vals=allAnos.map(a=>{const i=anos.indexOf(parseInt(a));return i>=0?DATA.emprego[ci].area[i]:null;});
+      if(state.g!=='todos') vals=getGenderVals(ci,'empArea');
+    } else if(taxa==='naArea'){
+      vals=allAnos.map(a=>{const i=anos.indexOf(parseInt(a));return i>=0?DATA.atuantes[ci].naArea[i]:null;});
+      if(state.g!=='todos') vals=getGenderVals(ci,'naArea');
+    } else if(taxa==='foraArea'){
+      vals=allAnos.map(a=>{const i=anos.indexOf(parseInt(a));return i>=0?DATA.atuantes[ci].foraArea[i]:null;});
+      if(state.g!=='todos') vals=getGenderVals(ci,'foraArea');
+    }
+    return vals;
+  }
+
+  // Gera os datasets do Chart.js, ajustando opacidade conforme destaque
+  function makeEmpDatasets(){
+    return criterioNames.map((nome,ci)=>{
+      const vals=getVals(ci);
+      const color=criterioColors[ci];
+      const isHL = empHighlight===null || empHighlight===ci;
+      const lineOp = isHL ? 0.82 : 0.15; // série não destacada fica translúcida
+      const dotOp  = isHL ? 0.90 : 0.18;
+      const bw = empHighlight===ci ? 4 : (ci===0?2.5:2); // linha destacada mais grossa
+      const pr = empHighlight===ci ? 8 : 5; // ponto destacado maior
+      return {
+        label:nome, data:vals,
+        borderColor:hex2rgba(color, lineOp),
+        backgroundColor:'transparent',
+        tension:0.3, fill:false,
+        pointRadius:pr, pointHoverRadius:pr+2,
+        pointBackgroundColor:hex2rgba(color, dotOp),
+        pointBorderColor:hex2rgba(color, dotOp),
+        borderWidth:bw,
+        borderDash:criterioStyles[ci], // linha tracejada por critério
+        spanGaps:true
+      };
+    });
+  }
+
+  // Atualiza estilo visual dos itens de legenda conforme empHighlight
+  function refreshEmpLegend(){
+    document.querySelectorAll('.ldot-emp').forEach(el=>{
+      const ci=parseInt(el.dataset.ci);
+      const active = empHighlight===null||empHighlight===ci;
+      el.style.fontWeight = empHighlight===ci ? '700' : '400';
+      el.style.opacity = active ? '1' : '0.35'; // itens não destacados ficam opacos
+      el.style.background = empHighlight===ci ? 'rgba(0,0,0,0.07)' : '';
+    });
+  }
+
+  // Injeta legenda clicável no #leg-emp
+  document.getElementById('leg-emp').innerHTML=criterioNames.map((n,i)=>`
+    <span class="ldot ldot-emp" data-ci="${i}"
+      style="cursor:pointer;padding:3px 7px;border-radius:20px;transition:all 0.15s;"
+      onclick="toggleEmpHighlight(${i})">
+      <span class="ldot-sq" style="background:${criterioColors[i]}"></span>${n}
+    </span>`).join('');
+
+  // Cria o gráfico com suporte a clique para destacar série
+  charts.emp=new Chart(document.getElementById('cEmprego'),{
+    type:'line',
+    data:{labels:allAnos,datasets:makeEmpDatasets()},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      onClick:(evt,els)=>{
+        // Clique em área vazia = remove destaque; clique em série = destaca/desfaz
+        if(!els||!els.length){empHighlight=null;}
+        else{
+          const ci=els[0].datasetIndex;
+          empHighlight = empHighlight===ci ? null : ci;
+        }
+        charts.emp.data.datasets=makeEmpDatasets();
+        charts.emp.update();
+        refreshEmpLegend();
+      },
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.raw!==null&&c.raw!==undefined?c.raw.toFixed(1)+'%':'—'}`}}},
+      scales:{
+        x:{ticks:{color:col.text2,font:{size:11}},grid:{color:col.gridLine},border:{display:false}},
+        y:{min:0,max:105,ticks:{color:col.text2,font:{size:11},callback:v=>v+'%'},grid:{color:col.gridLine},border:{display:false}}
+      }
+    }
+  });
+  refreshEmpLegend();
+}
+
+/* Alterna destaque de série na legenda do gráfico de emprego */
+function toggleEmpHighlight(ci){
+  empHighlight = empHighlight===ci ? null : ci;
+  buildChartEmprego();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+  buildChartAtuacao() — GRÁFICO 2: DISTRIBUIÇÃO DE ATUAÇÃO (donut)
+  Calcula médias de: % na área TI / % fora da área / % sem vínculo
+  Aplica filtros de critério, gênero e turma.
+  Renderiza o donut no canvas #cAtuacao e a legenda em #atu-labels.
+═══════════════════════════════════════════════════════════════════ */
+function buildChartAtuacao(){
+  dc('atu');
+  const c=state.c;
+  let naArea=DATA.atuantes[c].naArea.slice();
+  let foraArea=DATA.atuantes[c].foraArea.slice();
+
+  // Filtro de gênero: substitui pelos dados de gênero se necessário
+  if(state.g!=='todos'){
+    const gKey=state.c===3?3:0;
+    const gd=DATA.genero[gKey]?.[state.g];
+    if(gd){
+      naArea=DATA.anos[c].map((_,i)=>{const gi=gd.anos.indexOf(DATA.anos[c][i]);return gi>=0?gd.naArea[gi]:null});
+      foraArea=DATA.anos[c].map((_,i)=>{const gi=gd.anos.indexOf(DATA.anos[c][i]);return gi>=0?gd.foraArea[gi]:null});
+    }
+  }
+  // Filtro de turma: zera os dados das outras turmas
+  if(state.a!=='todos'){
+    const idx=DATA.anos[c].indexOf(parseInt(state.a));
+    naArea=naArea.map((v,i)=>i===idx?v:null);
+    foraArea=foraArea.map((v,i)=>i===idx?v:null);
+  }
+
+  // Calcula valores médios para o donut
+  const na=avg(naArea.filter(v=>v!==null));
+  const fa=avg(foraArea.filter(v=>v!==null));
+  const ne=na!==null&&fa!==null?Math.max(0,100-na-fa):null; // "sem vínculo" = 100% - na - fa
+  const col=getColors();
+
+  // Dados para a legenda lateral com mini barras
+  const labelsData = [
+    {label:'Na área TI', val:na, color:col.green},
+    {label:'Fora da área', val:fa, color:col.amber},
+    {label:'Sem vínculo', val:ne, color:'#cccccc'}
+  ];
+
+  // Injeta legenda com percentuais e barras proporcionais
+  document.getElementById('atu-labels').innerHTML = labelsData.map(l=>`
+    <div class="atu-label-row">
+      <span class="atu-label-dot" style="background:${l.color}"></span>
+      <span style="flex:1;font-size:11px;color:var(--ink2)">${l.label}</span>
+      <span class="atu-label-pct">${l.val!==null?l.val.toFixed(1)+'%':'—'}</span>
+      <div class="atu-label-bar"><div class="atu-label-bar-fill" style="width:${l.val??0}%;background:${l.color}"></div></div>
+    </div>`).join('');
+
+  // Garante tamanho fixo do canvas antes de renderizar
+  const canvas = document.getElementById('cAtuacao');
+  canvas.style.position='';canvas.style.top='';canvas.style.left='';
+  canvas.style.width='180px';canvas.style.height='180px';
+  canvas.parentElement.style.width='180px';
+  canvas.parentElement.style.height='180px';
+
+  // Cria o gráfico donut
+  charts.atu=new Chart(canvas,{
+    type:'doughnut',
+    data:{labels:['Na área TI','Fora da área','Sem vínculo'],datasets:[{
+      data:[na,fa,ne],
+      backgroundColor:[col.green+'dd',col.amber+'dd','#cccccc66'],
+      borderWidth:0,hoverOffset:6
+    }]},
+    options:{
+      responsive:false,maintainAspectRatio:false,cutout:'68%', // buraco central
+      plugins:{
+        legend:{display:false}, // usa legenda customizada (#atu-labels)
+        tooltip:{callbacks:{label:c=>`${c.label}: ${c.parsed!==null?c.parsed.toFixed(1)+'%':'—'}`}},
+        datalabels:{display:false}
+      }
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+  buildChartRenda() — GRÁFICO 3: RENDA POR ANO DE FORMATURA (linha)
+  Exibe mediana ou média de renda (geral e na área TI) por turma.
+  Filtros: critério e gênero se aplicam. Turma é IGNORADA.
+  O toggle Mediana/Média é controlado por state.rendaModo.
+═══════════════════════════════════════════════════════════════════ */
+function buildChartRenda(){
+  dc('renda');
+  const c=state.c;
+  const anos=DATA.anos[c].map(String);
+  const isMed = state.rendaModo==='mediana'; // true = mediana, false = média
+  let med=DATA.renda[c][isMed?'med':'mean'].slice();
+  let medA=DATA.renda[c][isMed?'medArea':'meanArea'].slice();
+
+  // Filtro de gênero: sobrescreve com dados de gênero se disponível
+  if(state.g!=='todos'){
+    const gKey=state.c===3?3:0;
+    const gd=DATA.genero[gKey]?.[state.g];
+    if(gd&&isMed){
+      med=DATA.anos[c].map((_,i)=>{const gi=gd.anos.indexOf(DATA.anos[c][i]);return gi>=0?(gd.medRenda[gi]||null):null});
+      medA=DATA.anos[c].map((_,i)=>{const gi=gd.anos.indexOf(DATA.anos[c][i]);return gi>=0?(gd.medArea[gi]||null):null});
+    } else if(gd&&!isMed){
+      med=DATA.anos[c].map((_,i)=>{const gi=gd.anos.indexOf(DATA.anos[c][i]);return gi>=0&&gd.medRenda[gi]?gd.medRenda[gi]:null});
+      medA=DATA.anos[c].map((_,i)=>{const gi=gd.anos.indexOf(DATA.anos[c][i]);return gi>=0&&gd.medArea[gi]?gd.medArea[gi]:null});
+    }
+  }
+  // Filtro de turma: explicitamente ignorado neste gráfico
+  if(state.a!=='todos'){
+    // turma filter intentionally ignored in this chart
+  }
+
+  // Converte zeros para null (evita pontos em R$0 que distorcem o gráfico)
+  med  = med.map(v  => (v===0||v===null||v===undefined) ? null : v);
+  medA = medA.map(v => (v===0||v===null||v===undefined) ? null : v);
+
+  const col=getColors();
+  const modoLabel = isMed?'Mediana':'Média';
+
+  // Atualiza legenda com label correto (Mediana/Média)
+  document.getElementById('leg-renda').innerHTML=`
+    <span class="ldot"><span class="ldot-sq" style="background:${col.purple}"></span>${modoLabel} geral</span>
+    <span class="ldot"><span class="ldot-sq" style="background:${col.teal}"></span>${modoLabel} na área TI</span>`;
+  document.getElementById('renda-sub').textContent='Valores corrigidos de acordo com IPCA para jan/2026';
+
+  // Oculta pontos onde o valor é null (pontRadius=0)
+  const prFn = ctx => (ctx.raw===null||ctx.raw===undefined||ctx.raw===0) ? 0 : 5;
+
+  // Cria o gráfico de linha de renda
+  charts.renda=new Chart(document.getElementById('cRenda'),{
+    type:'line',
+    data:{labels:anos,datasets:[
+      {label:`${modoLabel} geral`,data:med,borderColor:col.purple,backgroundColor:'transparent',tension:0.35,fill:false,pointRadius:prFn,pointHoverRadius:7,pointBackgroundColor:col.purple,borderWidth:2,spanGaps:false},
+      // Linha TI tracejada (borderDash:[5,4]) para diferenciar da geral
+      {label:`${modoLabel} TI`,data:medA,borderColor:col.teal,backgroundColor:'transparent',tension:0.35,borderDash:[5,4],pointRadius:prFn,pointHoverRadius:7,pointBackgroundColor:col.teal,borderWidth:2,spanGaps:false}
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.raw!==null&&c.raw!==undefined?'R$ '+Math.round(c.raw).toLocaleString('pt-BR'):'—'}`}}},
+      scales:{
+        x:{ticks:{color:col.text2,font:{size:11}},grid:{color:col.gridLine},border:{display:false}},
+        y:{ticks:{color:col.text2,font:{size:11},callback:v=>'R$'+Math.round(v/1000)+'k'},grid:{color:col.gridLine},border:{display:false}}
+      }
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+  buildTable() — TABELA DE INDICADORES
+  Monta thead e tbody dinamicamente com base nos filtros ativos.
+  Suporta ordenação por qualquer coluna (sortCol, sortDir).
+  Filtros: critério e gênero se aplicam. Turma é IGNORADA.
+═══════════════════════════════════════════════════════════════════ */
+let tableData=[];
+function buildTable(){
+  const c=state.c;
+  const anos=DATA.anos[c];
+
+  // Monta linhas base com todos os dados do critério selecionado
+  let rows=anos.map((ano,i)=>({
+    ano,n:DATA.egressos[c][i],
+    emp:DATA.emprego[c].geral[i],empA:DATA.emprego[c].area[i],
+    atN:DATA.atuantes[c].naArea[i],atF:DATA.atuantes[c].foraArea[i],
+    med:DATA.renda[c].med[i],medA:DATA.renda[c].medArea[i]
+  }));
+
+  // Filtro de gênero: substitui métricas relevantes pelos dados de gênero
+  if(state.g!=='todos'){
+    const gKey=c===3?3:0;
+    const gd=DATA.genero[gKey]?.[state.g];
+    if(gd){
+      rows=rows.map(r=>{
+        const gi=gd.anos.indexOf(r.ano);
+        if(gi<0) return r;
+        return {...r,
+          emp: gd.emprego[gi]??null,
+          empA: gd.empArea[gi]??null,
+          atN: gd.naArea[gi]??null,
+          atF: gd.foraArea[gi]??null,
+          med: gd.medRenda[gi]??null,
+          medA: (gd.medArea[gi]||null)
+        };
+      });
+    }
+  }
+
+  // Filtro de turma: explicitamente ignorado — tabela sempre exibe todas as turmas do critério
+  tableData=rows;
+
+  // Atualiza contador "X turmas visíveis"
+  document.getElementById('tbl-count').textContent=`${tableData.length} turma${tableData.length!==1?'s':''} visível${tableData.length!==1?'is':''}`;
+
+  const thead=document.querySelector('#main-table thead');
+  const tbody=document.querySelector('#main-table tbody');
+
+  // Definição das colunas: chave de dados + label do cabeçalho
+  const cols=[
+    {k:'ano',l:'Turma',num:false},{k:'n',l:'Egressos',num:true},
+    {k:'emp',l:'Tx. Emprego',num:true},{k:'empA',l:'Emprego TI',num:true},
+    {k:'atN',l:'Atuantes TI',num:true},{k:'atF',l:'Fora da Área',num:true},
+    {k:'med',l:'Mediana Geral',num:true},{k:'medA',l:'Mediana TI',num:true}
+  ];
+
+  // Injeta cabeçalho com classes de ordenação (sort-asc/sort-desc)
+  thead.innerHTML=`<tr>${cols.map((col,ci)=>`
+    <th class="${col.num?'num':''} ${sortCol===ci?(sortDir===1?'sort-asc':'sort-desc'):''}"
+        onclick="sortTable(${ci})">${col.l}</th>`).join('')}</tr>`;
+
+  // Ordena as linhas conforme a coluna e direção atuais
+  const sorted=[...tableData];
+  if(sortCol>=0){
+    const k=cols[sortCol].k;
+    // null sempre vai para o final, independente da direção
+    sorted.sort((a,b)=>{if(a[k]===null)return 1;if(b[k]===null)return -1;return(a[k]>b[k]?1:-1)*sortDir;});
+  }
+
+  // Injeta linhas da tabela formatadas
+  tbody.innerHTML=sorted.map(r=>{
+    const fmtEmp = r.emp!==null ? r.emp.toFixed(1)+'%' : '—';
+    const fmtEmpA = r.empA!==null ? r.empA.toFixed(1)+'%' : '—';
+    const fmtAtN = r.atN!==null ? r.atN.toFixed(1)+'%' : '—';
+    const fmtAtF = r.atF!==null ? r.atF.toFixed(1)+'%' : '—';
+    return `<tr>
+      <td style="text-align:center"><strong>${r.ano}</strong></td>
+      <td class="num">${r.n??'—'}</td>
+      <td class="num">${fmtEmp}</td>
+      <td class="num">${fmtEmpA}</td>
+      <td class="num">${fmtAtN}</td>
+      <td class="num">${fmtAtF}</td>
+      <td class="num" style="font-family:'IBM Plex Mono',monospace;font-size:11px">${r.med!==null?'R$\u00A0'+Math.round(r.med).toLocaleString('pt-BR'):'—'}</td>
+      <td class="num" style="font-family:'IBM Plex Mono',monospace;font-size:11px">${r.medA!==null?'R$\u00A0'+Math.round(r.medA).toLocaleString('pt-BR'):'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* Ordena a tabela: alterna direção se mesma coluna, reseta se nova coluna */
+function sortTable(ci){if(sortCol===ci)sortDir*=-1;else{sortCol=ci;sortDir=1;}buildTable();}
+
+/* ═══════════════════════════════════════════════════════════════════
+  buildGenderGrid() — CARDS DE GÊNERO (Masculino / Feminino)
+  Exibe dois cards lado a lado com estatísticas individuais por gênero.
+  Inclui: métricas em grid 3 colunas + mini barras de "% TI" por ano.
+  Usa sempre os dados de critério 0 (formação) ou 3 (3 anos após).
+  Não tem seção HTML fixa — injeta no container #gender-grid.
+═══════════════════════════════════════════════════════════════════ */
+function buildGenderGrid(){
+  const c=state.c;
+  const gKey=c===3?3:0;
+  const gData=DATA.genero[gKey]||DATA.genero[0];
+  const container=document.getElementById('gender-grid');
+  const genders=[{k:'M',l:'Masculino',cl:'#1a4bcc'},{k:'F',l:'Feminino',cl:'#5c30b5'}];
+  container.innerHTML=genders.map(g=>{
+    const d=gData[g.k];
+    // Calcula médias de cada métrica para exibir no card
+    const ae=avg(d.emprego);const aeA=avg(d.empArea);const aN=avg(d.naArea);const aF=avg(d.foraArea);
+    const am=avg(d.medRenda);const amA=avg(d.medArea.map(v=>v===0?null:v));
+    return `<div class="gcard">
+      <div class="gc-head"><div class="gc-ico" style="background:${g.cl}">${g.k}</div><div class="gc-title">${g.l}</div></div>
+      <div class="gc-stats">
+        <div class="gc-stat"><div class="gc-stat-lbl">Taxa emprego</div><div class="gc-stat-val">${ae!==null?ae.toFixed(1)+'%':'—'}</div></div>
+        <div class="gc-stat"><div class="gc-stat-lbl">Emprego TI</div><div class="gc-stat-val">${aeA!==null?aeA.toFixed(1)+'%':'—'}</div></div>
+        <div class="gc-stat"><div class="gc-stat-lbl">Atuantes TI</div><div class="gc-stat-val">${aN!==null?aN.toFixed(1)+'%':'—'}</div></div>
+        <div class="gc-stat"><div class="gc-stat-lbl">Fora da área</div><div class="gc-stat-val">${aF!==null?aF.toFixed(1)+'%':'—'}</div></div>
+        <div class="gc-stat"><div class="gc-stat-lbl">Mediana geral</div><div class="gc-stat-val" style="font-size:13px">${brl(am)}</div></div>
+        <div class="gc-stat"><div class="gc-stat-lbl">Mediana TI</div><div class="gc-stat-val" style="font-size:13px">${brl(amA)}</div></div>
+      </div>
+      <div style="margin-top:10px">
+        ${d.anos.map((ano,i)=>`<div class="mini-bar-row">
+          <span class="mini-bar-yr">${ano}</span>
+          <div class="mini-bar-track"><div class="mini-bar-fill" style="width:${d.naArea[i]}%;background:${g.cl}"></div></div>
+          <span class="mini-bar-val">${d.naArea[i].toFixed(0)}% TI</span>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+  buildChartProg() — GRÁFICO 4: PROGRESSÃO SALARIAL (linha)
+  Exibe a renda mediana de cada turma ao longo dos momentos:
+    "Formação" → "1 ano" → "2 anos" → "3 anos"
+  Cada turma é uma série colorida. Filtragem apenas por gênero.
+  Clicar na legenda ou no gráfico destaca/desfaz destaque de uma turma.
+  `disponivelPor` mapeia quais turmas têm dados em cada momento.
+═══════════════════════════════════════════════════════════════════ */
+let progHighlight = null;
+
+/* Converte hex #RRGGBB para rgba(r,g,b,a) — usado para controlar opacidade das linhas */
+function hex2rgba(h,a){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return `rgba(${r},${g},${b},${a})`;}
+
+function buildChartProg(){
+  dc('prog');
+  const col=getColors();
+  const xLabels=['Formação','1 ano','2 anos','3 anos'];
+
+  // Configuração de cor e índice para cada turma
+  const turmasCfg=[
+    {ano:2019,color:col.blue,   idx:0},
+    {ano:2020,color:col.green,  idx:1},
+    {ano:2021,color:col.pink,   idx:2},
+    {ano:2022,color:col.amber,  idx:3},
+    {ano:2023,color:col.yellow, idx:4},
+    {ano:2024,color:col.red,    idx:5},
+  ];
+
+  // Quais turmas têm dados disponíveis em cada ponto do eixo X
+  // ci=0 (formação) = todas; ci=3 (3 anos) = apenas turmas 0,1,2 (2019-2021)
+  const disponivelPor={0:[0,1,2,3,4,5],1:[0,1,2,3,4],2:[0,1,2,3],3:[0,1,2]};
+
+  const gd0 = state.g!=='todos' ? DATA.genero[0]?.[state.g] : null;
+  const gd3 = state.g!=='todos' ? DATA.genero[3]?.[state.g] : null;
+
+  // Para cada turma, monta o array de valores [formação, 1ano, 2anos, 3anos]
+  const turmas=turmasCfg.map(t=>{
+    const data = xLabels.map((_,ci)=>{
+      const disp=disponivelPor[ci];
+      if(!disp.includes(t.idx)) return null; // turma sem dado neste momento
+      if(state.g==='todos'){
+        return DATA.renda[ci].med[t.idx]??null;
+      }
+      // Com filtro de gênero: usa gd0 para momento 0, gd3 para momento 3
+      if(ci===0){
+        if(gd0){const gi=gd0.anos.indexOf(t.ano);if(gi>=0) return gd0.medRenda[gi]||null;}
+        return DATA.renda[0].med[t.idx]??null; // fallback para dado geral
+      }
+      if(ci===3){
+        if(gd3){const gi=gd3.anos.indexOf(t.ano);if(gi>=0) return gd3.medRenda[gi]||null;}
+        return null;
+      }
+      // Momentos 1 e 2 não têm breakdown por gênero — usa dado geral
+      return DATA.renda[ci].med[t.idx]??null;
+    });
+    const nonNull=data.filter(v=>v!==null).length;
+    return {ano:t.ano, color:t.color, data, hasLine:nonNull>=2}; // hasLine: conecta pontos se ≥2 disponíveis
+  });
+
+  // Exibe apenas turmas com pelo menos 1 ponto de dado
+  const turmasVisiveis=turmas.filter(t=>t.data.some(v=>v!==null));
+
+  // Gera datasets com opacidade ajustada conforme progHighlight
+  function makeDatasets(){
+    return turmasVisiveis.map(t=>{
+      const isHL = progHighlight===null || progHighlight===t.ano;
+      const lineOpacity = isHL ? 0.80 : 0.15;
+      const dotOpacity  = isHL ? 0.90 : 0.18;
+      const bw = progHighlight===t.ano ? 4 : 2.5;
+      const pr = progHighlight===t.ano ? 8 : 5.5;
+      return {
+        label:`Turma ${t.ano}`,
+        data:t.data,
+        borderColor:hex2rgba(t.color, lineOpacity),
+        backgroundColor:'transparent',
+        tension:0.3,fill:false,
+        pointRadius:pr,
+        pointHoverRadius:pr+2,
+        pointBackgroundColor:hex2rgba(t.color, dotOpacity),
+        pointBorderColor:hex2rgba(t.color, dotOpacity),
+        borderWidth:bw,
+        spanGaps:t.hasLine // conecta pontos apenas se turma tem ≥2 pontos
+      };
+    });
+  }
+
+  // Atualiza estilo visual dos itens de legenda do gráfico de progressão
+  function refreshLegend(){
+    document.querySelectorAll('.ldot-prog').forEach(el=>{
+      const a=parseInt(el.dataset.ano);
+      const active = progHighlight===null||progHighlight===a;
+      el.style.fontWeight = progHighlight===a ? '700' : '400';
+      el.style.opacity = active ? '1' : '0.35';
+      el.style.background = progHighlight===a ? 'rgba(0,0,0,0.07)' : '';
+    });
+  }
+
+  // Injeta legenda clicável no #leg-prog
+  document.getElementById('leg-prog').innerHTML=turmasVisiveis.map(t=>`
+    <span class="ldot ldot-prog" data-ano="${t.ano}"
+      style="cursor:pointer;padding:3px 7px;border-radius:20px;transition:all 0.15s;"
+      onclick="toggleProgHighlight(${t.ano})">
+      <span class="ldot-sq" style="background:${t.color}"></span>Turma ${t.ano}
+    </span>`).join('');
+
+  // Cria o gráfico de linha de progressão
+  charts.prog=new Chart(document.getElementById('cProg'),{
+    type:'line',
+    data:{labels:xLabels,datasets:makeDatasets()},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      onClick:(evt,els)=>{
+        // Clique em área vazia = remove destaque; clique em linha = destaca/desfaz
+        if(!els||!els.length){progHighlight=null;}
+        else{
+          const ano=parseInt(charts.prog.data.datasets[els[0].datasetIndex].label.replace('Turma ',''));
+          progHighlight = progHighlight===ano ? null : ano;
+        }
+        charts.prog.data.datasets=makeDatasets();
+        charts.prog.update();
+        refreshLegend();
+      },
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=>`Turma ${c.dataset.label.replace('Turma ','')}: ${c.parsed.y!==null?'R$ '+Math.round(c.parsed.y).toLocaleString('pt-BR'):'—'}`}}
+      },
+      scales:{
+        x:{ticks:{color:col.text2,font:{size:11}},grid:{color:col.gridLine},border:{display:false}},
+        y:{ticks:{color:col.text2,font:{size:11},callback:v=>'R$'+Math.round(v/1000)+'k'},grid:{color:col.gridLine},border:{display:false}}
+      }
+    }
+  });
+  refreshLegend();
+}
+
+/* Alterna destaque de turma na legenda do gráfico de progressão */
+function toggleProgHighlight(ano){
+  progHighlight = progHighlight===ano ? null : ano;
+  buildChartProg();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+  update() — ORQUESTRA A RECONSTRUÇÃO DE TODOS OS COMPONENTES
+  Chamada sempre que um filtro muda (exceto toggles internos dos gráficos).
+  Reconstrói KPIs, todos os gráficos e a tabela em sequência.
+═══════════════════════════════════════════════════════════════════ */
+function update(){
+  buildKPIs();
+  buildChartEmprego();
+  buildChartAtuacao();
+  buildChartRenda();
+  buildTable();
+  buildChartProg();
+}
+
+/* Inicialização: ao carregar a página, atualiza botões de turma e renderiza tudo */
+window.addEventListener('load',()=>{ updateYearButtons(); update(); });
+</script>
+</body>
+</html>
